@@ -3,15 +3,25 @@
   (:require 
   			[sablono.core :as sab]
             [cljs-http.client :as http]
+            [cljs.reader :as reader]
             [cljs.core.async :refer [<! timeout]]))
 
-(def app-state (atom { :status "-1" }))
+(def app-state (atom { :status "2" 
+ 					   :lastUpdate "0" ;;last time the device updated the lights
+ 					   :now "0" ;;time(ms) on the device now
+ 					   :timeRed "0"  
+ 					   :timeGreen "0" ;; 20 seconds 
+ 					   :timeYellow "0"
+ 					   :timeNotSafe "40000"})) ;;Not Safe to cross in the last 5 seconds
+
 
 ;;get status from web server
 (defn get-status []
-	(go (let [response (<! (http/get "http://192.168.2.15"
-                                 {:with-credentials? false}))]
-     		(swap! app-state update-in [:status] :status (:body response))))
+	(go (let [response (<! (http/get "http://192.168.2.12"
+                                 {:with-credentials? false}))
+			  body (:body response)]
+			  (prn (reader/read-string body)) ;;not working
+     		(swap! app-state body)))
 )
 
 ;;timer
@@ -38,14 +48,29 @@
 	  :else "black")
 )
 
+(defn safe-to-cross [data]
+	;; only safe to cross when the status is green and the person has enough time
+	(let [status (:status @data)
+		  tGreen (js/parseInt (:timeGreen @data))
+		  tLastUpdate (js/parseInt (:lastUpdate @data))
+		  tNow (js/parseInt (:now @data))
+		  tNotSafe (js/parseInt (:timeNotSafe @data))]
+		(if (and 
+				(= status "3") ;;Green
+				(> (- (+ tLastUpdate tGreen) tNow) tNotSafe)) ;; ((lastUpdate + timeGreen) - now) < ttc 
+			"safe" "not safe")
+	)	
+)
+
 (defn update-screen [data]
   (sab/html [:div
-             [:h1  "Status atual: " (:status @data)]
+             [:h1  (str "STATUS: " (:status @data) " " (:lastUpdate @data))]
              [:div [:a {:href "#"
                         :onClick #(get-status)}
-                    "Atualizar"]]
+                    "Refresh"]]
+             [:div [:p (str (safe-to-cross data) " to cross")]]
              [:div {:style {
-             			:line-height "0"
+             			:line-height "1px"
          				:font-size "400%"}}
              	[:p {:style{ 
              		 :color (light-to-display (:status @data) "1")}}
