@@ -11,6 +11,12 @@
     :builds [{:id "dev"
               :source-paths ["src"]
               :figwheel true
-              :compiler {:main "traffick-lights-web.core"}
+              :compiler {:main "traffick-lights-web.core"
+	      :asset-path "js/out"
+              :output-to "resources/public/js/main.js"
+              :output-dir "resources/public/js/out"}
              }]
+   }
+   :figwheel {
+    :server-port 5309   
    })
